@@ -2,7 +2,7 @@
  * Step: groups — Connect to WhatsApp, fetch group metadata, write to DB.
  * Replaces 05-sync-groups.sh + 05b-list-groups.sh
  */
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -124,6 +124,7 @@ const timeout = setTimeout(() => {
 
 sock.ev.on('creds.update', saveCreds);
 
+let done = false;
 sock.ev.on('connection.update', async (update) => {
   if (update.connection === 'open') {
     try {
@@ -141,11 +142,13 @@ sock.ev.on('connection.update', async (update) => {
       console.error('FETCH_ERROR:' + err.message);
     } finally {
       clearTimeout(timeout);
+      done = true;
       sock.end(undefined);
       db.close();
       process.exit(0);
     }
   } else if (update.connection === 'close') {
+    if (done) return;
     clearTimeout(timeout);
     console.error('CONNECTION_CLOSED');
     process.exit(1);
@@ -153,7 +156,7 @@ sock.ev.on('connection.update', async (update) => {
 });
 `;
 
-    const output = execSync(`node --input-type=module -e ${JSON.stringify(syncScript)}`, {
+    const output = execFileSync('node', ['--input-type=module', '-e', syncScript], {
       cwd: projectRoot,
       encoding: 'utf-8',
       timeout: 45000,
